@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinOps Dashboard — Disema Ramohaladi</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222535;
+    --border: rgba(255,255,255,0.07);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --text: #f1f5f9;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* SIDEBAR */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    flex-shrink: 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+  }
+  .logo-text { font-size: 15px; font-weight: 600; color: var(--text); }
+  .logo-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+  .nav-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+    color: var(--text-muted); padding: 0 20px; margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px; cursor: pointer;
+    color: var(--text-dim); font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    color: var(--blue); background: var(--blue-dim);
+    border-left-color: var(--blue);
+  }
+  .nav-icon { font-size: 16px; width: 18px; text-align: center; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .analyst-card {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .analyst-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .analyst-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .analyst-role { font-size: 11px; color: var(--text-muted); }
+
+  /* MAIN */
+  .main { margin-left: 220px; flex: 1; }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-left { display: flex; flex-direction: column; }
+  .topbar-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .topbar-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .period-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: var(--radius-sm);
+    padding: 6px 12px; font-size: 12px; cursor: pointer;
+  }
+  .alert-badge {
+    background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2);
+    color: var(--red); border-radius: var(--radius-sm);
+    padding: 5px 12px; font-size: 12px; font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red); animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* CONTENT */
+  .content { padding: 24px 28px; }
+  .section-gap { margin-bottom: 24px; }
+
+  /* SCREENS */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* METRIC GRID */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    position: relative; overflow: hidden;
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .metric-card.blue::before { background: var(--blue); }
+  .metric-card.green::before { background: var(--green); }
+  .metric-card.amber::before { background: var(--amber); }
+  .metric-card.red::before { background: var(--red); }
+  .metric-label { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .metric-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 8px; }
+  .metric-change {
+    font-size: 12px; display: flex; align-items: center; gap: 4px;
+  }
+  .change-up { color: var(--red); }
+  .change-down { color: var(--green); }
+  .change-neutral { color: var(--text-muted); }
+
+  /* GRID LAYOUTS */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .three-col { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .card-action {
+    font-size: 11px; color: var(--blue); cursor: pointer;
+    background: var(--blue-dim); padding: 4px 10px;
+    border-radius: 20px; border: none;
+  }
+
+  /* CHART WRAPPERS */
+  .chart-wrap { position: relative; }
+  .chart-wrap-sm { height: 200px; }
+  .chart-wrap-md { height: 240px; }
+  .chart-wrap-lg { height: 280px; }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 0 12px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text-dim);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .td-name { color: var(--text) !important; font-weight: 500; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 500; padding: 3px 8px;
+    border-radius: 20px;
+  }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+
+  /* ANOMALY ITEMS */
+  .anomaly-item {
+    border-left: 3px solid var(--red);
+    background: var(--red-dim);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .anomaly-item.warn {
+    border-left-color: var(--amber);
+    background: var(--amber-dim);
+  }
+  .anomaly-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .anomaly-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .anomaly-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  /* SAVINGS BARS */
+  .savings-item { margin-bottom: 16px; }
+  .savings-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .savings-name { font-size: 12px; color: var(--text); }
+  .savings-val { font-size: 12px; font-weight: 600; color: var(--green); }
+  .savings-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .savings-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width 1s ease; }
+
+  /* SAAS TABLE */
+  .util-bar { height: 4px; background: var(--surface2); border-radius: 2px; width: 80px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  .util-fill { height: 100%; border-radius: 2px; }
+
+  /* REPORT */
+  .insight-box {
+    background: var(--blue-dim);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .insight-title { font-size: 13px; font-weight: 600; color: var(--blue); margin-bottom: 4px; }
+  .insight-desc { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+
+  .kpi-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-row:last-child { border-bottom: none; }
+  .kpi-label { font-size: 12px; color: var(--text-dim); }
+  .kpi-value { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  /* FOOTER NOTE */
+  .portfolio-note {
+    text-align: center; padding: 20px;
+    font-size: 11px; color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; }
+    .metric-grid { grid-template-columns: repeat(2,1fr); }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">F</div>
+        <div>
+          <div class="logo-text">FinOps Centre</div>
+          <div class="logo-sub">Cloud Cost Intelligence</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-label">Analytics</div>
+    <div class="nav-item active" onclick="showScreen('overview', this)">
+      <span class="nav-icon">📊</span> Overview
+    </div>
+    <div class="nav-item" onclick="showScreen('anomalies', this)">
+      <span class="nav-icon">🔔</span> Anomalies
+    </div>
+    <div class="nav-item" onclick="showScreen('saas', this)">
+      <span class="nav-icon">🧩</span> SaaS governance
+    </div>
+    <div class="nav-item" onclick="showScreen('savings', this)">
+      <span class="nav-icon">💰</span> Savings opportunities
+    </div>
+    <div class="nav-item" onclick="showScreen('report', this)">
+      <span class="nav-icon">📋</span> Monthly report
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="analyst-card">
+        <div class="analyst-avatar">DR</div>
+        <div>
+          <div class="analyst-name">Disema Ramohaladi</div>
+          <div class="analyst-role">FinOps Analyst</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title" id="screen-title">Cloud cost overview</div>
+        <div class="topbar-sub">AWS · Azure · GCP · SaaS</div>
+      </div>
+      <div class="topbar-right">
+        <select class="period-select" onchange="updatePeriod(this.value)">
+          <option value="jun">June 2026</option>
+          <option value="may">May 2026</option>
+          <option value="apr">April 2026</option>
+        </select>
+        <div class="alert-badge">
+          <div class="badge-dot"></div>
+          3 active anomalies
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== OVERVIEW ===== -->
+      <div id="screen-overview" class="screen active">
+
+        <div class="metric-grid">
+          <div class="metric-card blue">
+            <div class="metric-label">Total spend</div>
+            <div class="metric-value" id="m-total">R4.2M</div>
+            <div class="metric-change change-up">↑ 12% vs last month</div>
+          </div>
+          <div class="metric-card amber">
+            <div class="metric-label">AWS spend</div>
+            <div class="metric-value" id="m-aws">R2.1M</div>
+            <div class="metric-change change-up">↑ 8% vs last month</div>
+          </div>
+          <div class="metric-card green">
+            <div class="metric-label">Savings identified</div>
+            <div class="metric-value" id="m-savings">R620K</div>
+            <div class="metric-change change-neutral">This month</div>
+          </div>
+          <div class="metric-card red">
+            <div class="metric-label">SaaS waste</div>
+            <div class="metric-value" id="m-waste">R208K</div>
+            <div class="metric-change change-neutral">Annual exposure</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">6-month spend trend</div>
+              <span class="badge badge-blue">R/month</span>
+            </div>
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="trendChart" role="img" aria-label="Line chart showing monthly spend trend January to June 2026"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Spend by platform</div>
+            </div>
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="donutChart" role="img" aria-label="Donut chart of cloud spend by platform"></canvas>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>AWS 43%</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Azure 21%</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>GCP 12%</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>SaaS 18%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card section-gap">
+          <div class="card-header">
+            <div class="card-title">Spend by department</div>
+            <span class="badge badge-amber">June 2026</span>
+          </div>
+          <div class="chart-wrap chart-wrap-md">
+            <canvas id="deptChart" role="img" aria-label="Bar chart showing cloud spend by department"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== ANOMALIES ===== -->
+      <div id="screen-anomalies" class="screen">
+
+        <div class="metric-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="metric-card red">
+            <div class="metric-label">High severity</div>
+            <div class="metric-value">1</div>
+            <div class="metric-change change-up">Requires immediate action</div>
+          </div>
+          <div class="metric-card amber">
+            <div class="metric-label">Medium severity</div>
+            <div class="metric-value">2</div>
+            <div class="metric-change change-neutral">Under investigation</div>
+          </div>
+          <div class="metric-card green">
+            <div class="metric-label">Total waste identified</div>
+            <div class="metric-value">R222K</div>
+            <div class="metric-change change-neutral">This week</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Active anomalies</div>
+              <span class="badge badge-red">3 unresolved</span>
+            </div>
+
+            <div class="anomaly-item">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div class="anomaly-title">AWS EC2 — Payments service</div>
+                <span class="badge badge-red">High</span>
+              </div>
+              <div class="anomaly-desc">14 m5.2xlarge instances running at 11% avg CPU. Auto-scaling triggered but never scaled back down after traffic normalised.</div>
+              <div class="anomaly-meta">💸 Waste: R180,000 · Detected: 24 June · Owner: Payments Engineering</div>
+            </div>
+
+            <div class="anomaly-item warn">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div class="anomaly-title">GCP Cloud Storage — Data team</div>
+                <span class="badge badge-amber">Medium</span>
+              </div>
+              <div class="anomaly-desc">2.3TB of raw log data sitting in Standard tier. Should be moved to Nearline storage. No lifecycle policy configured.</div>
+              <div class="anomaly-meta">💸 Waste: R28,000/mo · Detected: 21 June · Owner: Data Engineering</div>
+            </div>
+
+            <div class="anomaly-item warn">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div class="anomaly-title">Azure — Dev/test environments</div>
+                <span class="badge badge-amber">Medium</span>
+              </div>
+              <div class="anomaly-desc">3 dev environments left running over the weekend. No auto-shutdown policy in place. Engineers unaware.</div>
+              <div class="anomaly-meta">💸 Waste: R14,000 · Detected: 23 June · Owner: Platform Engineering</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Weekly anomaly trend</div>
+            </div>
+            <div class="chart-wrap chart-wrap-sm">
+              <canvas id="anomalyChart" role="img" aria-label="Bar chart showing anomalies detected per week"></canvas>
+            </div>
+            <div style="margin-top:16px">
+              <div class="card-title" style="margin-bottom:12px">Resolution status</div>
+              <div class="chart-wrap" style="height:150px">
+                <canvas id="resolutionChart" role="img" aria-label="Doughnut chart of anomaly resolution status"></canvas>
+              </div>
+              <div class="legend" style="justify-content:center">
+                <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Resolved 67%</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Open 33%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== SAAS ===== -->
+      <div id="screen-saas" class="screen">
+
+        <div class="metric-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="metric-card blue">
+            <div class="metric-label">Total SaaS tools</div>
+            <div class="metric-value">12</div>
+            <div class="metric-change change-neutral">Active platforms</div>
+          </div>
+          <div class="metric-card red">
+            <div class="metric-label">Underutilised</div>
+            <div class="metric-value">3</div>
+            <div class="metric-change change-up">Below 70% usage</div>
+          </div>
+          <div class="metric-card amber">
+            <div class="metric-label">Licences wasted</div>
+            <div class="metric-value">128</div>
+            <div class="metric-change change-up">Inactive 90+ days</div>
+          </div>
+          <div class="metric-card green">
+            <div class="metric-label">Annual saving available</div>
+            <div class="metric-value">R208K</div>
+            <div class="metric-change change-neutral">If actioned now</div>
+          </div>
+        </div>
+
+        <div class="card section-gap">
+          <div class="card-header">
+            <div class="card-title">SaaS licence utilisation</div>
+            <span class="badge badge-amber">June 2026</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Licences paid</th>
+                <th>Active users</th>
+                <th>Utilisation</th>
+                <th>Monthly cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="td-name">Slack</td>
+                <td>350</td><td>348</td>
+                <td>99% <span class="util-bar"><span class="util-fill" style="width:99%;background:#10b981"></span></span></td>
+                <td>R42,000</td>
+                <td><span class="badge badge-green">Healthy</span></td>
+              </tr>
+              <tr>
+                <td class="td-name">GitHub Enterprise</td>
+                <td>200</td><td>198</td>
+                <td>99% <span class="util-bar"><span class="util-fill" style="width:99%;background:#10b981"></span></span></td>
+                <td>R36,000</td>
+                <td><span class="badge badge-green">Healthy</span></td>
+              </tr>
+              <tr>
+                <td class="td-name">Jira + Confluence</td>
+                <td>300</td><td>241</td>
+                <td>80% <span class="util-bar"><span class="util-fill" style="width:80%;background:#f59e0b"></span></span></td>
+                <td>R28,000</td>
+                <td><span class="badge badge-amber">Review</span></td>
+              </tr>
+              <tr>
+                <td class="td-name">Datadog</td>
+                <td>120</td><td>68</td>
+                <td>57% <span class="util-bar"><span class="util-fill" style="width:57%;background:#ef4444"></span></span></td>
+                <td>R18,000</td>
+                <td><span class="badge badge-red">Waste</span></td>
+              </tr>
+              <tr>
+                <td class="td-name">Figma</td>
+                <td>80</td><td>43</td>
+                <td>54% <span class="util-bar"><span class="util-fill" style="width:54%;background:#ef4444"></span></span></td>
+                <td>R14,000</td>
+                <td><span class="badge badge-red">Waste</span></td>
+              </tr>
+              <tr>
+                <td class="td-name">Notion</td>
+                <td>150</td><td>122</td>
+                <td>81% <span class="util-bar"><span class="util-fill" style="width:81%;background:#f59e0b"></span></span></td>
+                <td>R9,000</td>
+                <td><span class="badge badge-amber">Review</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Utilisation by platform</div></div>
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="saasChart" role="img" aria-label="Horizontal bar chart showing SaaS licence utilisation percentages"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Recommended actions</div></div>
+            <div class="anomaly-item" style="border-left-color:#3b82f6;background:rgba(59,130,246,0.08)">
+              <div class="anomaly-title" style="color:#93c5fd">Reclaim 52 Datadog licences</div>
+              <div class="anomaly-desc">Identify inactive users, notify team leads, reduce contract at next renewal in 45 days.</div>
+              <div class="anomaly-meta">💰 Saves R104,000/year</div>
+            </div>
+            <div class="anomaly-item warn">
+              <div class="anomaly-title">Renegotiate Figma contract</div>
+              <div class="anomaly-desc">Renewal in 6 weeks. Usage supports reducing from 80 to 50 seats. Competitor quotes secured.</div>
+              <div class="anomaly-meta">💰 Saves R84,000/year</div>
+            </div>
+            <div class="anomaly-item" style="border-left-color:#10b981;background:rgba(16,185,129,0.08)">
+              <div class="anomaly-title" style="color:#6ee7b7">Review Jira inactive seats</div>
+              <div class="anomaly-desc">59 seats idle for 90+ days. Reclaim before next billing cycle closes.</div>
+              <div class="anomaly-meta">💰 Saves R20,000/year</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== SAVINGS ===== -->
+      <div id="screen-savings" class="screen">
+
+        <div class="metric-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="metric-card green">
+            <div class="metric-label">Total opportunity</div>
+            <div class="metric-value">R620K</div>
+            <div class="metric-change change-neutral">Identified this month</div>
+          </div>
+          <div class="metric-card blue">
+            <div class="metric-label">Actioned</div>
+            <div class="metric-value">R210K</div>
+            <div class="metric-change change-down">34% captured</div>
+          </div>
+          <div class="metric-card amber">
+            <div class="metric-label">Pending action</div>
+            <div class="metric-value">R410K</div>
+            <div class="metric-change change-neutral">Awaiting approval</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Savings by category</div>
+            </div>
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="savingsChart" role="img" aria-label="Bar chart showing savings opportunities by category"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Rightsizing opportunities — AWS EC2</div></div>
+            <div class="savings-item">
+              <div class="savings-row">
+                <div class="savings-name">Payments service (14× m5.2xlarge)</div>
+                <div class="savings-val">R180K/mo</div>
+              </div>
+              <div class="savings-bar"><div class="savings-fill" style="width:85%"></div></div>
+            </div>
+            <div class="savings-item">
+              <div class="savings-row">
+                <div class="savings-name">Reporting jobs → Spot Instances</div>
+                <div class="savings-val">R95K/mo</div>
+              </div>
+              <div class="savings-bar"><div class="savings-fill" style="width:55%"></div></div>
+            </div>
+            <div class="savings-item">
+              <div class="savings-row">
+                <div class="savings-name">Dev cluster off-hours shutdown</div>
+                <div class="savings-val">R42K/mo</div>
+              </div>
+              <div class="savings-bar"><div class="savings-fill" style="width:28%"></div></div>
+            </div>
+            <div class="savings-item">
+              <div class="savings-row">
+                <div class="savings-name">GCP storage tier migration</div>
+                <div class="savings-val">R28K/mo</div>
+              </div>
+              <div class="savings-bar"><div class="savings-fill" style="width:18%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card section-gap">
+          <div class="card-header">
+            <div class="card-title">AWS Savings Plan — coverage analysis</div>
+            <span class="badge badge-red">62% uncovered</span>
+          </div>
+          <div class="chart-wrap chart-wrap-md">
+            <canvas id="coverageChart" role="img" aria-label="Stacked bar chart showing AWS savings plan coverage vs on-demand spend over 6 months"></canvas>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Covered by savings plan</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Full on-demand price (wasteful)</div>
+          </div>
+          <div style="margin-top:16px;padding:14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px">
+            <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:4px">Recommendation</div>
+            <div style="font-size:12px;color:#94a3b8;line-height:1.6">Purchasing a 1-year Compute Savings Plan at R85,000/hour commitment would reduce on-demand exposure by approximately 60%, saving an estimated R210,000/month — R2.5M annually. Risk is low based on 6-month baseline analysis showing consistent usage above this threshold.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== REPORT ===== -->
+      <div id="screen-report" class="screen">
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Executive summary — June 2026</div>
+              <span class="badge badge-blue">For CFO + CTO</span>
+            </div>
+            <div class="kpi-row"><div class="kpi-label">Total cloud + SaaS spend</div><div class="kpi-value">R4,200,000</div></div>
+            <div class="kpi-row"><div class="kpi-label">Month-on-month change</div><div class="kpi-value" style="color:#ef4444">+12% (R450,000)</div></div>
+            <div class="kpi-row"><div class="kpi-label">Savings captured this month</div><div class="kpi-value" style="color:#10b981">R210,000 recovered</div></div>
+            <div class="kpi-row"><div class="kpi-label">Anomalies detected</div><div class="kpi-value">3 detected · 1 resolved</div></div>
+            <div class="kpi-row"><div class="kpi-label">SaaS licence waste (annual)</div><div class="kpi-value" style="color:#f59e0b">R208,000 at risk</div></div>
+            <div class="kpi-row"><div class="kpi-label">July forecast (with actions)</div><div class="kpi-value" style="color:#10b981">R3,900,000</div></div>
+            <div class="kpi-row"><div class="kpi-label">12-month savings potential</div><div class="kpi-value" style="color:#10b981">R7,440,000</div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">Spend forecast — next 3 months</div></div>
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="forecastChart" role="img" aria-label="Line chart showing actual vs projected spend forecast"></canvas>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Actual spend</div>
+              <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Projected (with optimisation)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card section-gap">
+          <div class="card-header"><div class="card-title">Key decisions required from leadership</div></div>
+
+          <div class="insight-box">
+            <div class="insight-title">Approve 1-year AWS Savings Plan commitment</div>
+            <div class="insight-desc">Committing R85,000/hour to a 1-year Compute Savings Plan will save approximately R2.5M over 12 months. Based on 6 months of stable baseline usage, risk is low. Requires CFO sign-off before 15 July to capture next billing cycle savings.</div>
+          </div>
+
+          <div class="insight-box" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.2)">
+            <div class="insight-title" style="color:#f59e0b">Mandate SaaS licence governance policy</div>
+            <div class="insight-desc">Engineering and product teams need a formal policy requiring FinOps review before new SaaS tool purchases and at every renewal. Without this, licence waste will continue to grow as headcount scales. Estimated impact of policy: R400,000+/year in avoided waste.</div>
+          </div>
+
+          <div class="insight-box" style="background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.2)">
+            <div class="insight-title" style="color:#10b981">Implement auto-shutdown policy for dev environments</div>
+            <div class="insight-desc">A simple automated rule to shut down non-production environments outside business hours (weekdays 18:00–07:00 and weekends) would save an estimated R168,000/year with zero impact on developer productivity.</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="portfolio-note">
+      Built by Disema Ramohaladi · FinOps Analyst Portfolio · Sample data for demonstration purposes
+    </div>
+
+  </main>
+</div>
+
+<script>
+const titles = {
+  overview: 'Cloud cost overview',
+  anomalies: 'Cost anomaly detection',
+  saas: 'SaaS licence governance',
+  savings: 'Savings opportunities',
+  report: 'Monthly leadership report'
+};
+
+function showScreen(id, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('screen-title').textContent = titles[id];
+}
+
+const gridColor = 'rgba(255,255,255,0.05)';
+const textColor = '#64748b';
+
+const periodData = {
+  jun: { total:'R4.2M', aws:'R2.1M', trend:[3100,3300,3600,3900,3750,4200] },
+  may: { total:'R3.75M', aws:'R1.9M', trend:[2900,3100,3400,3700,3750,3500] },
+  apr: { total:'R3.9M', aws:'R2.0M', trend:[2700,2900,3200,3500,3800,3900] }
+};
+
+function updatePeriod(v) {
+  const d = periodData[v];
+  document.getElementById('m-total').textContent = d.total;
+  document.getElementById('m-aws').textContent = d.aws;
+  if(window.trendChart) {
+    window.trendChart.data.datasets[0].data = d.trend;
+    window.trendChart.update();
+  }
+}
+
+Chart.defaults.color = textColor;
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+
+window.trendChart = new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+    datasets: [{
+      label: 'Total spend (R000)',
+      data: [3100,3300,3600,3900,3750,4200],
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      tension: 0.4, fill: true,
+      pointBackgroundColor: '#3b82f6', pointRadius: 4
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => 'R' + v + 'K' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['AWS','Azure','GCP','SaaS'],
+    datasets: [{ data: [2100,1050,588,890], backgroundColor: ['#3b82f6','#10b981','#f59e0b','#64748b'], borderWidth: 0 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '68%',
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: e => ' R' + e.raw.toLocaleString() + 'K' } } }
+  }
+});
+
+new Chart(document.getElementById('deptChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Payments','Platform Engineering','Data','Product','Operations'],
+    datasets: [{ label: 'Spend (R000)', data: [1800,1100,720,580,200], backgroundColor: ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#64748b'], borderRadius: 6 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => 'R' + v + 'K' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('anomalyChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Wk 1','Wk 2','Wk 3','Wk 4'],
+    datasets: [
+      { label: 'High', data: [0,1,0,1], backgroundColor: '#ef4444', borderRadius: 4 },
+      { label: 'Medium', data: [1,2,1,2], backgroundColor: '#f59e0b', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top', labels: { color: textColor, font: { size: 11 }, boxWidth: 10 } } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } }, stacked: true },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, stepSize: 1 }, stacked: true }
+    }
+  }
+});
+
+new Chart(document.getElementById('resolutionChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Resolved','Open'],
+    datasets: [{ data: [67,33], backgroundColor: ['#10b981','#ef4444'], borderWidth: 0 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '60%',
+    plugins: { legend: { display: false } }
+  }
+});
+
+new Chart(document.getElementById('saasChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Slack','GitHub','Notion','Jira','Datadog','Figma'],
+    datasets: [{ label: 'Utilisation %', data: [99,99,81,80,57,54], backgroundColor: ['#10b981','#10b981','#f59e0b','#f59e0b','#ef4444','#ef4444'], borderRadius: 4 }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => v + '%' }, max: 100 },
+      y: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('savingsChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Rightsizing','Savings Plans','SaaS licences','Storage tiers','Idle resources'],
+    datasets: [{ label: 'Savings (R000)', data: [317,210,208,28,42], backgroundColor: '#10b981', borderRadius: 6 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => 'R' + v + 'K' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('coverageChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+    datasets: [
+      { label: 'Savings plan coverage', data: [800,820,850,870,860,798], backgroundColor: '#10b981', borderRadius: 4 },
+      { label: 'On-demand (full price)', data: [2300,2480,2750,3030,2890,3402], backgroundColor: '#ef4444', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } }, stacked: true },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => 'R' + v + 'K' }, stacked: true }
+    }
+  }
+});
+
+new Chart(document.getElementById('forecastChart'), {
+  type: 'line',
+  data: {
+    labels: ['Apr','May','Jun','Jul','Aug','Sep'],
+    datasets: [
+      { label: 'Actual', data: [3900,3750,4200,null,null,null], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', tension: 0.4, fill: true, pointBackgroundColor: '#3b82f6', pointRadius: 4 },
+      { label: 'Projected', data: [null,null,4200,3900,3600,3300], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.05)', tension: 0.4, fill: true, borderDash: [5,4], pointBackgroundColor: '#10b981', pointRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: textColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: v => 'R' + v + 'K' }, min: 2800 }
+    }
+  }
+});
+</script>
+</body>
+</html>
